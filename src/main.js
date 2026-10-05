@@ -1,7 +1,7 @@
 import './style.css';
 
 const API = (import.meta.env.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbxq6lXJWgs9CDTDJp9S-ehpehPFhRXHpRxrEo6TqMaep4W4tUImfB9UmmMzbTZU60KeGQ/exec').trim();
-const SHORT_BASE = (import.meta.env.VITE_SHORT_BASE || 'https://panyasawasdee-hub.github.io/kps-short-link/').trim();
+const SHORT_BASE = (import.meta.env.VITE_SHORT_BASE || 'https://panyasawasdee-hub.github.io/').trim();
 const QR_PREVIEW_SIZE = 220;
 const app = document.querySelector('#app');
 const state = { page: 'home', links: [], selected: null, result: null, dashboard: null, stats: null, filter: 'all', search: '', qrSize: 512, busy: false };
