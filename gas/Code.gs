@@ -87,7 +87,7 @@ function rateLimitCreate_(clientId) {
   try {
     var clientCount = Number(cache.get(clientKey) || 0);
     var globalCount = Number(cache.get(globalKey) || 0);
-    if (clientCount >= 5) throw appError_('RATE_LIMITED', 'สร้างลิงก์ได้ไม่เกิน 5 ครั้งต่อ 10 นาที กรุณารอสักครู่');
+    if (clientCount >= 60) throw appError_('RATE_LIMITED', 'สร้างลิงก์ได้ไม่เกิน 60 ครั้งต่อ 10 นาที กรุณารอสักครู่');
     if (globalCount >= 100) throw appError_('RATE_LIMITED', 'ระบบมีการใช้งานจำนวนมาก กรุณาลองใหม่ภายหลัง');
     cache.put(clientKey, String(clientCount + 1), 660);
     cache.put(globalKey, String(globalCount + 1), 3660);
