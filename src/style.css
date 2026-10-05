@@ -3,3 +3,20 @@
 @media(max-width:1180px){.layout{grid-template-columns:220px minmax(0,1fr)}.sidebar{padding:22px 12px}.topbar{padding:0 25px}#content{padding:25px}.hero-stats{display:none}.home-grid{margin-left:12px;margin-right:12px}.list-toolbar{flex-wrap:wrap}.list-toolbar input{max-width:none;flex:1;min-width:260px}.dashboard-stats{gap:10px}}
 @media(max-width:800px){.layout{display:block}.sidebar{display:none;position:fixed;z-index:60;width:260px;box-shadow:10px 0 30px #1d123544}.sidebar.open{display:flex}.topbar{height:58px;padding:0 17px}.mobile-brand{display:block;background:none;border:0;color:#251738;font-size:22px}.breadcrumb{font-size:11px}.top-search{min-width:0;padding:8px;border:0}.top-search span,.top-search kbd{display:none}#content{padding:15px 15px 90px}.mobile-nav{position:fixed;z-index:50;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e8e2ef;display:flex;justify-content:space-around;padding:6px 0 max(6px,env(safe-area-inset-bottom))}.mobile-nav a{display:flex;flex-direction:column;align-items:center;font-size:24px;color:#9a8fac;line-height:1.1;min-width:74px}.mobile-nav a.active{color:#5636a1}.mobile-nav small{font-size:10px}.hero{border-radius:17px;padding:26px 24px 35px;min-height:0}.hero h1{font-size:29px}.hero p{font-size:12px}.home-grid{grid-template-columns:1fr;margin:16px 0}.form-card,.qr-panel{padding:22px}.recent{margin:22px 0}.recent .link-list{overflow-x:auto}.page-heading{align-items:start}.page-heading h1{font-size:26px}.detail-grid,.dashboard-grid{grid-template-columns:1fr}.dashboard-stats{grid-template-columns:repeat(2,1fr)}.detail-info>div{padding:16px;flex-wrap:wrap}.detail-info .meta-grid{grid-template-columns:repeat(2,1fr)}.list-board{border:0;background:none;box-shadow:none}.list-toolbar{padding:0 0 14px}.list-toolbar input{min-width:100%}.filter-tabs{width:100%;overflow-x:auto}.list-toolbar .btn{margin-left:0}.table-head{display:none}.list-board #rows{overflow:visible}.link-list:not(.compact){background:transparent;display:grid;gap:10px}.link-list:not(.compact) .link-row{min-width:0;display:grid;grid-template-columns:1fr auto;gap:8px;border:1px solid #e6e1eb;border-radius:13px;background:#fff;padding:14px}.link-list:not(.compact) .link-identity{grid-column:1/3}.link-list:not(.compact) .target-col{display:none}.link-list:not(.compact) .click-col{grid-column:1}.link-list:not(.compact) .row-actions{grid-column:2;grid-row:3/5}.link-list:not(.compact) .status{grid-column:1}.link-list:not(.compact) .short-col{grid-column:1/3}.link-list:not(.compact) .row-actions button{min-width:37px;height:37px}.heading-actions{flex-wrap:wrap}.bars{height:190px}.bar-col small{font-size:8px}}
 @media(max-width:440px){.hero h1{font-size:25px}.hero p br{display:none}.section-heading .btn{padding:7px 9px;font-size:11px}.page-heading{flex-direction:column}.page-heading>.btn{align-self:stretch}.stat-card{padding:15px;min-height:105px}.stat-card strong{font-size:27px}.filter-tabs button{font-size:11px;padding:7px}.qr-panel .panel-heading{align-items:start}.success-pill{font-size:10px}.download-row{gap:6px}}
+
+/* Keep the desktop workspace compact on wide screens. */
+@media(min-width:801px){
+  #content{padding:24px 32px 52px}
+  .page{max-width:1220px}
+  .hero{border-radius:20px;padding:32px 36px 96px;min-height:285px}
+  .hero h1{font-size:clamp(30px,2.5vw,40px);margin:10px 0}
+  .hero-stats{top:42px;right:35px}
+  .home-grid{grid-template-columns:1fr 1fr;align-items:start;gap:18px;margin:-68px 18px 0}
+  .form-card,.qr-panel{padding:22px 24px}
+  .panel-heading{margin-bottom:16px}
+  .field{margin:12px 0}
+  .field input,.list-toolbar input{height:46px}
+  .submit-btn{min-height:48px}
+  .empty-result{min-height:330px}
+  .recent{margin:24px 18px}
+}
