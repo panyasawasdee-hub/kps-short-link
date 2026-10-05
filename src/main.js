@@ -17,6 +17,15 @@ function toast(message, bad = false) { const box = el('div', 'toast' + (bad ? ' 
 function configured() { if (!API || API.includes('YOUR_DEPLOYMENT_ID')) { toast('กรุณาตั้งค่า VITE_GAS_URL ก่อนใช้งาน', true); return false; } return true; }
 function route(page, code) { location.hash = page === 'detail' ? `#/detail/${encodeURIComponent(code)}` : `#/${page}`; }
 function currentRoute() { const bits = location.hash.replace(/^#\/?/, '').split('/'); return { page: ['home', 'links', 'dashboard', 'detail', 'settings', 'guide'].includes(bits[0]) ? bits[0] : 'home', code: decodeURIComponent(bits[1] || '') }; }
+function publicClientId() {
+  const key = 'kps_public_client_id';
+  let id = localStorage.getItem(key);
+  if (!/^[A-Za-z0-9_-]{16,80}$/.test(id || '')) {
+    id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2)}_${Math.random().toString(36).slice(2)}`;
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
 function publicShortUrl(link) {
   const code = link.alias || String(link.code).replace(/^0+(?=\d)/, '');
   const url = new URL(SHORT_BASE); url.search = `?${encodeURIComponent(code)}`; url.hash = ''; return url.href;
@@ -31,12 +40,16 @@ function normalizePayload(data) {
 function mutate(action, body) {
   if (!configured()) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า API'));
   const token = sessionStorage.getItem('kps_admin_token');
-  if (!token) return Promise.reject(new Error('กรุณาใส่รหัสผู้ดูแลในหน้าตั้งค่า'));
+  const isPublicCreate = action === 'createLink';
+  if (!isPublicCreate && !token) return Promise.reject(new Error('กรุณาเข้าสู่ระบบผู้ดูแล'));
   return new Promise((resolve, reject) => {
     const nonce = `${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const iframe = el('iframe', 'transport-frame'); iframe.name = `transport_${nonce}`;
     const form = document.createElement('form'); form.method = 'POST'; form.action = `${API}?action=${encodeURIComponent(action)}`; form.target = iframe.name; form.className = 'transport-frame';
-    for (const [name, value] of Object.entries({ nonce, payload: JSON.stringify({ ...body, token }) })) {
+    const payload = { ...body };
+    if (token) payload.token = token;
+    if (isPublicCreate) payload.clientId = publicClientId();
+    for (const [name, value] of Object.entries({ nonce, payload: JSON.stringify(payload) })) {
       const input = document.createElement('input'); input.type = 'hidden'; input.name = name; input.value = value; form.append(input);
     }
     const timer = setTimeout(() => finish(new Error('API ไม่ตอบกลับ กรุณาลองใหม่')), 25000);
@@ -174,10 +187,17 @@ function renderDashboard() {
   const top = wrap.querySelector('#top-links'); if (!d.topLinks.length) top.append(el('p', 'muted', 'ยังไม่มีข้อมูล'));
   d.topLinks.forEach((l, i) => { const item = el('a', 'top-link'); item.href = `#/detail/${encodeURIComponent(l.code)}`; item.innerHTML = html`<span>${String(i + 1).padStart(2, '0')}</span><strong>${l.title}</strong><b>${fmtNumber(l.clicks)}</b>`; top.append(item); }); shell(wrap);
 }
-function renderSettings() {
+function renderSettingsLegacy() {
   const wrap = el('div', 'page settings-page'); wrap.innerHTML = html`<div class="page-heading"><div><div class="eyebrow">SYSTEM</div><h1>ตั้งค่าระบบ</h1><p>ตั้งค่ารหัสผู้ดูแลสำหรับสร้างและจัดการลิงก์ในเบราว์เซอร์นี้</p></div></div><section class="card"><h2>การเชื่อมต่อ</h2><p>GAS API: ${API || 'ยังไม่ได้ตั้งค่า VITE_GAS_URL'}</p><form id="token-form"><label class="field"><span>รหัสผู้ดูแล</span><input name="token" type="password" autocomplete="off" placeholder="วาง ADMIN_TOKEN จาก Script Properties" required></label><button class="btn btn-primary" type="submit">บันทึกในเซสชันนี้</button><button class="btn btn-outline" type="button" id="clear-token">ลบรหัส</button></form><p class="muted">รหัสเก็บใน sessionStorage ของแท็บนี้ และจะหายเมื่อปิดแท็บ อย่าใช้เครื่องสาธารณะโดยไม่ออกจากระบบ</p></section>`;
   wrap.querySelector('#token-form').onsubmit = e => { e.preventDefault(); sessionStorage.setItem('kps_admin_token', e.currentTarget.querySelector('[name="token"]').value.trim()); e.currentTarget.reset(); toast('บันทึกรหัสแล้ว'); };
   wrap.querySelector('#clear-token').onclick = () => { sessionStorage.removeItem('kps_admin_token'); toast('ลบรหัสแล้ว'); }; shell(wrap);
+}
+function renderSettings() {
+  const wrap = el('div', 'page settings-page');
+  wrap.innerHTML = '<div class="page-heading"><div><div class="eyebrow">ADMIN</div><h1>ผู้ดูแลระบบ</h1></div></div><section class="card"><form id="token-form"><label class="field"><span>รหัสผู้ดูแล</span><input name="token" type="password" autocomplete="off" required></label><button class="btn btn-primary" type="submit">เข้าสู่ระบบ</button><button class="btn btn-outline" type="button" id="clear-token">ออกจากระบบ</button></form></section>';
+  wrap.querySelector('#token-form').onsubmit = e => { e.preventDefault(); sessionStorage.setItem('kps_admin_token', e.currentTarget.querySelector('[name="token"]').value.trim()); e.currentTarget.reset(); toast('เข้าสู่ระบบผู้ดูแลแล้ว'); route('home'); };
+  wrap.querySelector('#clear-token').onclick = () => { sessionStorage.removeItem('kps_admin_token'); state.links = []; state.dashboard = null; toast('ออกจากระบบแล้ว'); };
+  shell(wrap);
 }
 function renderGuide() {
   const wrap = el('div', 'page settings-page');
@@ -187,7 +207,7 @@ function renderGuide() {
 async function load(page, code) {
   state.page = page; state.selected = page === 'detail' ? state.links.find(l => l.code === code) || null : state.selected;
   if (page === 'home') renderHome(); if (page === 'links') renderLinks(); if (page === 'detail') renderDetail(); if (page === 'dashboard') renderDashboard(); if (page === 'settings') renderSettings(); if (page === 'guide') renderGuide();
-  if (!API || API.includes('YOUR_DEPLOYMENT_ID')) return;
+  if (!API || API.includes('YOUR_DEPLOYMENT_ID') || !sessionStorage.getItem('kps_admin_token')) return;
   try {
     if (page === 'home' || page === 'links') {
       const links = await mutate('getLinks', { limit: 500 }); state.links = links;

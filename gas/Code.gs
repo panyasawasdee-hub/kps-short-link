@@ -53,13 +53,13 @@ function doPost(e) {
   var result;
   try {
     var body = JSON.parse(p.payload || '{}');
-    authorize_(body.token);
+    if (p.action !== 'createLink') authorize_(body.token);
     switch (p.action) {
       case 'getLinks': result = ok_(getLinks_(body)); break;
       case 'getLink': result = ok_(getLink_(body.code)); break;
       case 'getStats': result = ok_(getStats_(body.code)); break;
       case 'getDashboard': result = ok_(getDashboard_()); break;
-      case 'createLink': result = ok_(createLink_(body)); break;
+      case 'createLink': rateLimitCreate_(body.clientId); result = ok_(createLink_(body)); break;
       case 'updateLink': result = ok_(updateLink_(body)); break;
       case 'disableLink': result = ok_(setStatus_(body.code, 'disabled')); break;
       case 'enableLink': result = ok_(setStatus_(body.code, 'active')); break;
@@ -76,6 +76,23 @@ function authorize_(token) {
   var expected = PropertiesService.getScriptProperties().getProperty('ADMIN_TOKEN');
   if (!expected || !token || String(token) !== expected) throw appError_('UNAUTHORIZED', 'รหัสผู้ดูแลไม่ถูกต้อง');
 }
+function rateLimitCreate_(clientId) {
+  var id = String(clientId || '');
+  if (!/^[A-Za-z0-9_-]{16,80}$/.test(id)) throw appError_('INVALID_CLIENT', 'กรุณาโหลดหน้าเว็บใหม่แล้วลองอีกครั้ง');
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, id, Utilities.Charset.UTF_8);
+  var clientKey = 'create:c:' + Utilities.base64EncodeWebSafe(digest).slice(0, 32) + ':' + Math.floor(Date.now() / 600000);
+  var globalKey = 'create:g:' + Math.floor(Date.now() / 3600000);
+  var cache = CacheService.getScriptCache();
+  var lock = LockService.getScriptLock(); lock.waitLock(5000);
+  try {
+    var clientCount = Number(cache.get(clientKey) || 0);
+    var globalCount = Number(cache.get(globalKey) || 0);
+    if (clientCount >= 5) throw appError_('RATE_LIMITED', 'สร้างลิงก์ได้ไม่เกิน 5 ครั้งต่อ 10 นาที กรุณารอสักครู่');
+    if (globalCount >= 100) throw appError_('RATE_LIMITED', 'ระบบมีการใช้งานจำนวนมาก กรุณาลองใหม่ภายหลัง');
+    cache.put(clientKey, String(clientCount + 1), 660);
+    cache.put(globalKey, String(globalCount + 1), 3660);
+  } finally { lock.releaseLock(); }
+}
 function ok_(data) { return { success: true, data: data }; }
 function appError_(code, message) { var e = new Error(message); e.code = code; return e; }
 function errorResult_(err) { return { success: false, error: { code: err.code || 'INTERNAL_ERROR', message: err.code ? err.message : 'ระบบขัดข้อง กรุณาลองอีกครั้ง' } }; }
@@ -89,6 +106,15 @@ function isUrl_(value) { return /^https?:\/\/(?:[A-Za-z0-9_-]+\.)*[A-Za-z0-9_-]+
 function url_(value) {
   var v = String(value || '').trim();
   if (!isUrl_(v) || v.length > 4000 || /[\u0000-\u001f]/.test(v)) throw appError_('INVALID_URL', 'กรุณาใช้ลิงก์ http หรือ https ที่ถูกต้อง');
+  return v;
+}
+function publicUrl_(value) {
+  var v = url_(value);
+  var authority = ((v.match(/^https?:\/\/([^\/?#]*)/i) || [])[1] || '');
+  if (authority.indexOf('@') !== -1) throw appError_('UNSAFE_URL', 'ไม่อนุญาตลิงก์ที่มีข้อมูลเข้าสู่ระบบ');
+  var host = authority.replace(/:\d+$/, '').replace(/^\[|\]$/g, '').toLowerCase();
+  var privateHost = host === 'localhost' || /\.local$/.test(host) || /^(?:0|10|127)\./.test(host) || /^169\.254\./.test(host) || /^192\.168\./.test(host) || /^172\.(?:1[6-9]|2\d|3[01])\./.test(host) || /^100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\./.test(host) || host === '::1';
+  if (privateHost) throw appError_('UNSAFE_URL', 'ไม่อนุญาตลิงก์ภายในหรือที่อยู่เครือข่ายส่วนตัว');
   return v;
 }
 function alias_(value) {
@@ -134,7 +160,7 @@ function shortUrl_(code) {
   return base ? base + '?id=' + encodeURIComponent(code) : '';
 }
 function createLink_(body) {
-  var target = url_(body.targetUrl), alias = alias_(body.alias), expires = expiry_(body.expiresAt);
+  var target = publicUrl_(body.targetUrl), alias = alias_(body.alias), expires = expiry_(body.expiresAt);
   var title = String(body.title || '').trim().slice(0, 180);
   var lock = LockService.getScriptLock(); lock.waitLock(10000);
   try {
