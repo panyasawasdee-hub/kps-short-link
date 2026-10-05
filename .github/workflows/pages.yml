@@ -27,6 +27,7 @@ jobs:
         env:
           VITE_GAS_URL: ${{ vars.VITE_GAS_URL }}
           VITE_BASE_PATH: ${{ vars.VITE_BASE_PATH }}
+          VITE_SHORT_BASE: ${{ vars.VITE_SHORT_BASE }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

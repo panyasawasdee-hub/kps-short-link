@@ -1,6 +1,8 @@
 import './style.css';
 
 const API = (import.meta.env.VITE_GAS_URL || 'https://script.google.com/macros/s/AKfycbxq6lXJWgs9CDTDJp9S-ehpehPFhRXHpRxrEo6TqMaep4W4tUImfB9UmmMzbTZU60KeGQ/exec').trim();
+const SHORT_BASE = (import.meta.env.VITE_SHORT_BASE || 'https://panyasawasdee-hub.github.io/kps-short-link/').trim();
+const QR_PREVIEW_SIZE = 220;
 const app = document.querySelector('#app');
 const state = { page: 'home', links: [], selected: null, result: null, dashboard: null, stats: null, filter: 'all', search: '', qrSize: 512, busy: false };
 const labels = { home: 'สร้างลิงก์สั้น', links: 'ลิงก์ทั้งหมด', dashboard: 'แดชบอร์ด', detail: 'รายละเอียดลิงก์', settings: 'ตั้งค่าระบบ', guide: 'คู่มือการใช้งาน' };
@@ -15,6 +17,13 @@ function toast(message, bad = false) { const box = el('div', 'toast' + (bad ? ' 
 function configured() { if (!API || API.includes('YOUR_DEPLOYMENT_ID')) { toast('กรุณาตั้งค่า VITE_GAS_URL ก่อนใช้งาน', true); return false; } return true; }
 function route(page, code) { location.hash = page === 'detail' ? `#/detail/${encodeURIComponent(code)}` : `#/${page}`; }
 function currentRoute() { const bits = location.hash.replace(/^#\/?/, '').split('/'); return { page: ['home', 'links', 'dashboard', 'detail', 'settings', 'guide'].includes(bits[0]) ? bits[0] : 'home', code: decodeURIComponent(bits[1] || '') }; }
+function publicShortUrl(code) { const url = new URL(SHORT_BASE); url.search = `?id=${encodeURIComponent(code)}`; url.hash = ''; return url.href; }
+function normalizeLink(link) { return link && link.code ? { ...link, shortUrl: publicShortUrl(link.code) } : link; }
+function normalizePayload(data) {
+  if (Array.isArray(data)) return data.map(normalizeLink);
+  if (data?.topLinks) return { ...data, topLinks: data.topLinks.map(normalizeLink) };
+  return normalizeLink(data);
+}
 
 function mutate(action, body) {
   if (!configured()) return Promise.reject(new Error('ยังไม่ได้ตั้งค่า API'));
@@ -33,7 +42,7 @@ function mutate(action, body) {
       if (!/^https:\/\/([a-z0-9-]+\.)?(googleusercontent\.com|google\.com)$/i.test(event.origin)) return;
       let message; try { message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data; } catch { return; }
       if (message?.type !== 'kps-link-result' || message.nonce !== nonce) return;
-      message.result?.success ? finish(null, message.result.data) : finish(new Error(message.result?.error?.message || 'บันทึกไม่สำเร็จ'));
+      message.result?.success ? finish(null, normalizePayload(message.result.data)) : finish(new Error(message.result?.error?.message || 'บันทึกไม่สำเร็จ'));
     }
     window.addEventListener('message', onMessage); document.body.append(iframe, form); form.submit();
   });
@@ -56,7 +65,7 @@ async function renderQR(holder, link) {
   holder.textContent = 'กำลังสร้าง QR...';
   const QRCode = (await import('qrcode')).default;
   const canvas = document.createElement('canvas');
-  await QRCode.toCanvas(canvas, link.shortUrl, { width: state.qrSize, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#1c1235', light: '#ffffff' } });
+  await QRCode.toCanvas(canvas, link.shortUrl, { width: QR_PREVIEW_SIZE, margin: 2, errorCorrectionLevel: 'M', color: { dark: '#1c1235', light: '#ffffff' } });
   holder.replaceChildren(canvas);
 }
 async function downloadQR(link, kind) {
@@ -72,7 +81,7 @@ function qrPanel(link, dark = false) {
   panel.innerHTML = html`<div class="panel-heading"><div><h2>${dark ? 'QR Code' : 'ลิงก์พร้อมใช้งาน'}</h2><p>QR นี้เข้ารหัส Short URL เปลี่ยนปลายทางได้ภายหลัง</p></div><span class="success-pill">✓ พร้อมใช้งาน</span></div><div class="url-strip"><span class="short-text">${link.shortUrl}</span><button class="btn btn-dark copy-btn">▣ คัดลอก</button></div><div class="qr-frame"><div class="qr-target"></div></div><div class="size-toggle"><button data-size="256">256</button><button data-size="512">512 px</button><button data-size="1024">1024</button></div><div class="download-row"><button class="btn btn-gold" data-kind="png">♧ PNG</button><button class="btn btn-outline" data-kind="svg">♧ SVG</button></div>`;
   panel.querySelector('.copy-btn').onclick = () => copy(link.shortUrl);
   panel.querySelectorAll('[data-kind]').forEach(b => b.onclick = () => downloadQR(link, b.dataset.kind).catch(e => toast(e.message, true)));
-  panel.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { state.qrSize = Number(b.dataset.size); panel.querySelectorAll('[data-size]').forEach(x => x.classList.toggle('active', x === b)); renderQR(panel.querySelector('.qr-target'), link).catch(e => toast(e.message, true)); });
+  panel.querySelectorAll('[data-size]').forEach(b => b.onclick = () => { state.qrSize = Number(b.dataset.size); panel.querySelectorAll('[data-size]').forEach(x => x.classList.toggle('active', x === b)); });
   panel.querySelector(`[data-size="${state.qrSize}"]`)?.classList.add('active');
   renderQR(panel.querySelector('.qr-target'), link).catch(e => toast(e.message, true));
   return panel;
@@ -188,4 +197,6 @@ async function load(page, code) {
 }
 window.addEventListener('hashchange', () => { const r = currentRoute(); load(r.page, r.code); });
 window.addEventListener('keydown', e => { if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); route('links'); setTimeout(() => document.querySelector('#search')?.focus(), 50); } });
-const initial = currentRoute(); load(initial.page, initial.code);
+const redirectCode = new URLSearchParams(location.search).get('id');
+if (redirectCode && /^[A-Za-z0-9_-]{3,40}$/.test(redirectCode)) location.replace(`${API}?id=${encodeURIComponent(redirectCode)}`);
+else { const initial = currentRoute(); load(initial.page, initial.code); }
