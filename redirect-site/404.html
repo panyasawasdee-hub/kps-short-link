@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>KPS Link</title>
+  <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f7f8fc;color:#352750;font:16px system-ui,sans-serif}</style>
+</head>
+<body>
+  <p>กำลังเปิดลิงก์...</p>
+  <script>
+    const manager = 'https://panyasawasdee-hub.github.io/kps-short-link/';
+    const pathCode = /^\/[A-Za-z0-9_-]{1,40}\/?$/.test(location.pathname) ? location.pathname.replaceAll('/', '') : '';
+    const params = new URLSearchParams(location.search);
+    const firstKey = Array.from(params.keys())[0] || '';
+    const bare = /^[A-Za-z0-9_-]{1,40}$/.test(firstKey) && params.get(firstKey) === '' ? firstKey : '';
+    const code = params.get('id') || bare || pathCode;
+    location.replace(code ? manager + '?' + encodeURIComponent(code) : manager);
+  </script>
+</body>
+</html>
