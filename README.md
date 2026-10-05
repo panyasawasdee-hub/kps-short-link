@@ -57,7 +57,10 @@ API ทั้งอ่านและเขียนใช้ form POST ผ่�
 
 ## ข้อจำกัด
 
-- ยังไม่ได้ deploy จริง เพราะต้องใช้บัญชี Google และ GitHub ของโรงเรียน
+- โค้ดอยู่ในรีโพ Private: https://github.com/panyasawasdee-hub/kps-short-link
+- โปรเจกต์ GAS: https://script.google.com/d/17q-aO3zOR7I-0KdcIH17KND0bH8T6EEAI-Mc85G-3zohT6RdgwyFm9NV/edit
+- GAS Web App ถูก deploy แล้ว และฐานข้อมูลผ่าน `setup()` แล้ว URL เริ่มต้นถูกกำหนดไว้ในหน้าเว็บและ `.env.example`
+- แผน GitHub ปัจจุบันไม่รองรับ GitHub Pages สำหรับรีโพ Private นี้ จึงยังไม่มี URL หน้าเว็บที่โฮสต์บน GitHub Pages; รันหน้าเว็บด้วย `npm run dev` ได้
 - การนับคลิกเขียน Google Sheets หนึ่งครั้งต่อคลิก เหมาะกับปริมาณใช้งานระดับโรงเรียนทั่วไป หากทราฟฟิกสูงมากควรเปลี่ยนเป็นการบันทึกแบบ batch
 - `CacheService` เร่งการอ่านปลายทาง และล้าง cache ทันทีเมื่อแก้หรือปิดลิงก์
 - โค้ดอัตโนมัติ 5 ตัวอักษรขึ้นไป อิงจากลำดับ ID จึงคาดเดาได้; token ป้องกันการอ่านข้อมูลจัดการและแก้ไข แต่ผู้ที่ทราบ Short URL ยังเปิดปลายทางได้ตามปกติ
