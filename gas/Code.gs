@@ -12,6 +12,7 @@ function setup() {
     if (!book.getSheetByName(name)) book.insertSheet(name);
   });
   ensureHeader_(book.getSheetByName('links'), LINK_HEADERS);
+  book.getSheetByName('links').getRange('B:B').setNumberFormat('@');
   ensureHeader_(book.getSheetByName('click_logs'), LOG_HEADERS);
   ensureHeader_(book.getSheetByName('settings'), ['key', 'value']);
   book.getSheetByName('click_logs').getRange('C:C').setNumberFormat('@');
@@ -33,8 +34,17 @@ function ensureHeader_(sheet, headers) {
 
 function doGet(e) {
   var p = e && e.parameter || {};
+  if (p.id && p.callback === '__kpsRedirect') return redirectJsonp_(p.id);
   if (p.id) return redirect_(p.id);
   return ContentService.createTextOutput('Not found');
+}
+
+function redirectJsonp_(code) {
+  var result;
+  try { result = { success: true, targetUrl: resolveTarget_(code) }; }
+  catch (err) { result = { success: false, error: err.code ? err.message : 'เปิดลิงก์ไม่ได้' }; }
+  var body = '__kpsRedirect(' + JSON.stringify(result).replace(/</g, '\\u003c') + ');';
+  return ContentService.createTextOutput(body).setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
 function doPost(e) {
@@ -95,15 +105,25 @@ function expiry_(value) {
 function encode62_(n) {
   var s = '';
   do { s = BASE62[n % 62] + s; n = Math.floor(n / 62); } while (n > 0);
-  return s.padStart(5, '0');
+  return s;
 }
 function rowFor_(code) {
   var sheet = linksSheet_();
   var last = sheet.getLastRow();
-  if (last < 2 || !/^[A-Za-z0-9_-]{3,40}$/.test(String(code || ''))) return null;
-  var hit = sheet.getRange(2, 2, last - 1, 1).createTextFinder(String(code)).matchEntireCell(true).matchCase(true).findNext();
-  if (!hit) return null;
-  return { sheet: sheet, row: hit.getRow(), values: sheet.getRange(hit.getRow(), 1, 1, LINK_HEADERS.length).getValues()[0] };
+  var requested = String(code || '');
+  if (last < 2 || !/^[A-Za-z0-9_-]{1,40}$/.test(requested)) return null;
+  var codeRange = sheet.getRange(2, 2, last - 1, 1);
+  var hit = codeRange.createTextFinder(requested).matchEntireCell(true).matchCase(true).findNext();
+  var row = hit && hit.getRow();
+  if (!row && /^\d+$/.test(requested)) {
+    var compact = requested.replace(/^0+(?=\d)/, '');
+    var codes = codeRange.getDisplayValues();
+    for (var i = 0; i < codes.length; i++) {
+      if (String(codes[i][0]).replace(/^0+(?=\d)/, '') === compact) { row = i + 2; break; }
+    }
+  }
+  if (!row) return null;
+  return { sheet: sheet, row: row, values: sheet.getRange(row, 1, 1, LINK_HEADERS.length).getValues()[0] };
 }
 function toLink_(v) {
   var expires = v[7] ? String(v[7]) : '';
@@ -169,25 +189,25 @@ function setStatus_(code, status) {
 }
 
 function redirect_(code) {
-  var link;
   try {
-    var cache = CacheService.getScriptCache();
-    var cached = cache.get('link:' + code);
-    if (cached) link = JSON.parse(cached);
-    else {
-      link = getLink_(code);
-      cache.put('link:' + code, JSON.stringify(link), 21600);
-    }
-    if (link.status === 'disabled') throw appError_('LINK_DISABLED', 'ลิงก์นี้ถูกปิดใช้งาน');
-    if (link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now()) throw appError_('LINK_EXPIRED', 'ลิงก์นี้หมดอายุแล้ว');
-    if (!isUrl_(link.targetUrl)) throw appError_('INVALID_URL', 'ปลายทางไม่ถูกต้อง');
-    try { trackClick_(code); } catch (ignore) { /* redirect still works if analytics fails */ }
-    var safe = String(link.targetUrl).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    var scriptUrl = JSON.stringify(link.targetUrl).replace(/</g, '\\u003c');
+    var target = resolveTarget_(code);
+    var safe = String(target).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var scriptUrl = JSON.stringify(target).replace(/</g, '\\u003c');
     return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><meta http-equiv="refresh" content="0;url=' + safe + '"><script>location.replace(' + scriptUrl + ')<\/script><a href="' + safe + '">เปิดลิงก์</a>');
   } catch (err) {
     return HtmlService.createHtmlOutput('<!doctype html><meta charset="utf-8"><p style="font-family:sans-serif;padding:2rem">' + (err.code ? err.message : 'เปิดลิงก์ไม่ได้') + '</p>');
   }
+}
+function resolveTarget_(code) {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('link:' + code);
+  var link = cached ? JSON.parse(cached) : getLink_(code);
+  if (!cached) cache.put('link:' + code, JSON.stringify(link), 21600);
+  if (link.status === 'disabled') throw appError_('LINK_DISABLED', 'ลิงก์นี้ถูกปิดใช้งาน');
+  if (link.expiresAt && new Date(link.expiresAt).getTime() <= Date.now()) throw appError_('LINK_EXPIRED', 'ลิงก์นี้หมดอายุแล้ว');
+  if (!isUrl_(link.targetUrl)) throw appError_('INVALID_URL', 'ปลายทางไม่ถูกต้อง');
+  try { trackClick_(code); } catch (ignore) { /* redirect still works if analytics fails */ }
+  return link.targetUrl;
 }
 function trackClick_(code) {
   var lock = LockService.getScriptLock();

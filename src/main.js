@@ -17,8 +17,11 @@ function toast(message, bad = false) { const box = el('div', 'toast' + (bad ? ' 
 function configured() { if (!API || API.includes('YOUR_DEPLOYMENT_ID')) { toast('กรุณาตั้งค่า VITE_GAS_URL ก่อนใช้งาน', true); return false; } return true; }
 function route(page, code) { location.hash = page === 'detail' ? `#/detail/${encodeURIComponent(code)}` : `#/${page}`; }
 function currentRoute() { const bits = location.hash.replace(/^#\/?/, '').split('/'); return { page: ['home', 'links', 'dashboard', 'detail', 'settings', 'guide'].includes(bits[0]) ? bits[0] : 'home', code: decodeURIComponent(bits[1] || '') }; }
-function publicShortUrl(code) { const url = new URL(SHORT_BASE); url.search = `?id=${encodeURIComponent(code)}`; url.hash = ''; return url.href; }
-function normalizeLink(link) { return link && link.code ? { ...link, shortUrl: publicShortUrl(link.code) } : link; }
+function publicShortUrl(link) {
+  const code = link.alias || String(link.code).replace(/^0+(?=\d)/, '');
+  const url = new URL(SHORT_BASE); url.search = `?${encodeURIComponent(code)}`; url.hash = ''; return url.href;
+}
+function normalizeLink(link) { return link && link.code ? { ...link, shortUrl: publicShortUrl(link) } : link; }
 function normalizePayload(data) {
   if (Array.isArray(data)) return data.map(normalizeLink);
   if (data?.topLinks) return { ...data, topLinks: data.topLinks.map(normalizeLink) };
@@ -197,6 +200,22 @@ async function load(page, code) {
 }
 window.addEventListener('hashchange', () => { const r = currentRoute(); load(r.page, r.code); });
 window.addEventListener('keydown', e => { if (e.ctrlKey && e.key.toLowerCase() === 'k') { e.preventDefault(); route('links'); setTimeout(() => document.querySelector('#search')?.focus(), 50); } });
-const redirectCode = new URLSearchParams(location.search).get('id');
-if (redirectCode && /^[A-Za-z0-9_-]{3,40}$/.test(redirectCode)) location.replace(`${API}?id=${encodeURIComponent(redirectCode)}`);
+function startPublicRedirect(code) {
+  app.innerHTML = '<main style="min-height:100vh;display:grid;place-items:center;font-family:sans-serif;color:#352750"><p id="redirect-status">กำลังเปิดลิงก์...</p></main>';
+  const status = document.querySelector('#redirect-status');
+  const callback = '__kpsRedirect';
+  const script = document.createElement('script');
+  const timer = setTimeout(() => { status.textContent = 'เปิดลิงก์ไม่สำเร็จ กรุณาลองใหม่'; script.remove(); }, 15000);
+  window[callback] = result => {
+    clearTimeout(timer); script.remove(); delete window[callback];
+    if (result?.success && validUrl(result.targetUrl)) location.replace(result.targetUrl);
+    else status.textContent = result?.error || 'ไม่พบลิงก์นี้';
+  };
+  script.onerror = () => { clearTimeout(timer); status.textContent = 'เชื่อมต่อระบบลิงก์ไม่ได้ กรุณาลองใหม่'; };
+  script.src = `${API}?id=${encodeURIComponent(code)}&callback=${callback}`;
+  document.head.append(script);
+}
+const params = new URLSearchParams(location.search);
+const redirectCode = params.get('id') || (/^\?[A-Za-z0-9_-]{1,40}$/.test(location.search) ? location.search.slice(1) : '');
+if (redirectCode && /^[A-Za-z0-9_-]{1,40}$/.test(redirectCode)) startPublicRedirect(redirectCode);
 else { const initial = currentRoute(); load(initial.page, initial.code); }
