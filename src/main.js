@@ -205,13 +205,14 @@ function startPublicRedirect(code) {
   const status = document.querySelector('#redirect-status');
   const callback = '__kpsRedirect';
   const script = document.createElement('script');
-  const timer = setTimeout(() => { status.textContent = 'เปิดลิงก์ไม่สำเร็จ กรุณาลองใหม่'; script.remove(); }, 15000);
+  const slowTimer = setTimeout(() => { status.textContent = 'กำลังเริ่มระบบ กรุณารอสักครู่...'; }, 10000);
+  const timer = setTimeout(() => { status.textContent = 'เปิดลิงก์ไม่สำเร็จ กรุณาลองใหม่'; script.remove(); }, 45000);
   window[callback] = result => {
-    clearTimeout(timer); script.remove(); delete window[callback];
+    clearTimeout(slowTimer); clearTimeout(timer); script.remove(); delete window[callback];
     if (result?.success && validUrl(result.targetUrl)) location.replace(result.targetUrl);
     else status.textContent = result?.error || 'ไม่พบลิงก์นี้';
   };
-  script.onerror = () => { clearTimeout(timer); status.textContent = 'เชื่อมต่อระบบลิงก์ไม่ได้ กรุณาลองใหม่'; };
+  script.onerror = () => { clearTimeout(slowTimer); clearTimeout(timer); status.textContent = 'เชื่อมต่อระบบลิงก์ไม่ได้ กรุณาลองใหม่'; };
   script.src = `${API}?id=${encodeURIComponent(code)}&callback=${callback}`;
   document.head.append(script);
 }
